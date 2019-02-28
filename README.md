@@ -2,6 +2,7 @@
 自动扫雷
 
 ## TODO
+- [ ] python 实现算法原型
 * [ ] 准备跨平台，先要确定平台:
 *  * visual studio - C# xamarin
 *  * visual studio - c++ lib + GDI + NDK + Native-Android
