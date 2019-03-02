@@ -16,11 +16,6 @@ class CellStatus(Enum):
     _8 = 8: 已被点开的标着数字8的格子
     Unknown = 9: 未被点开的未标旗子的格子
     Flagged = 10: 未被点开的已标旗子的格子
-
-    用于扫雷AI的状态
-    ToFlag = 11: Unknown状态下的格子,已计算出此格子必然是雷,准备标旗子
-    ToSpace = 12: Unknown状态下的格子,已计算出此格子必然不是雷,准备点开
-    ToFlagOrSpace = 13: Unknown状态下的格子,已计算出此格子不确定是否有雷
     '''
     Space = 0
     _1 = 1
@@ -33,9 +28,6 @@ class CellStatus(Enum):
     _8 = 8
     Unknown = 9
     Flagged = 10
-    ToFlag = 11
-    ToSpace = 12
-    ToFlagOrSpace = 13
 
 class BoardSizeError(Exception):
     '''
@@ -114,17 +106,14 @@ class MinesweeperGenerator(metaclass=ABCMeta):
 
 class MinesweeperOperator(metaclass=ABCMeta):
     '用于操作扫雷的接口类'
-    @abstractmethod
-    def cell(self, x, y):
-        '''
-        获取一个扫雷棋盘中的格子的状态
 
-        参数:
-            x: 横坐标 ∈[0,Width)
-            y: 纵坐标 ∈[0,Height)
+    @abstractmethod
+    def all_cells(self):
+        '''
+        获取一个扫雷棋盘中所有格子的状态的深拷贝
 
         返回值:
-            指定格子的状态, CellStatus
+            所有格子的状态, list[list[CellStatus]]
         '''
         pass
 
@@ -139,7 +128,7 @@ class MinesweeperOperator(metaclass=ABCMeta):
             y: 纵坐标 ∈[0,Height)
 
         返回值:
-            无
+            是否踩雷, bool
         '''
         pass
 
@@ -158,6 +147,30 @@ class MinesweeperOperator(metaclass=ABCMeta):
         '''
         pass
 
+    @abstractmethod
+    def open_final(self, x, y):
+        '''
+        当数字与其周围的标旗数相同时，自动展开数字周围
+
+        参数:
+            x: 横坐标 ∈[0,Width)
+            y: 纵坐标 ∈[0,Height)
+
+        返回值:
+            是否踩雷, bool
+        '''
+        pass
+
+    @abstractmethod
+    def is_win(self):
+        '是否获胜, 返回bool'
+        pass
+
+    @abstractmethod
+    def remain_mines(self):
+        '剩余雷数, 返回int'
+        pass
+
 class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
     '''
     扫雷类
@@ -169,7 +182,7 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
         self.__mineCount = 0
 
     def generate(self, mineCount, x, y):
-        import random, ipdb
+        import random
         self.boardInfo.xycheck(x, y)
         if mineCount < 1:
             raise MineCountError('雷数小于1')
@@ -230,16 +243,15 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
                 if tempCells[i][j] == 0:
                     self._3BV += 1
                     floodfill(i, j)
-        print(self._3BV)
         for i in range(self.boardInfo.Width):
             for j in range(self.boardInfo.Height):
                 assert tempCells[i][j] in [1, 2]
                 if tempCells[i][j] != 2:
                     self._3BV += 1
 
-    def cell(self, x, y):
-        self.boardInfo.xycheck(x, y)
-        return self.cells[x][y]
+    def all_cells(self):
+        import copy
+        return copy.deepcopy(self.cells)
 
     def open(self, x, y):
         self.boardInfo.xycheck(x, y)
@@ -267,7 +279,6 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
                 self.__open_expand(i, j)
 
     def open_final(self, x, y):
-        '当数字与其周围的标旗数相同时，自动展开数字周围'
         if self.cells[x][y].value not in range(1, 9):
             return True
 
@@ -296,3 +307,23 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
                 for j in range(max(0, y-1), min(self.boardInfo.Height, y+2))
         ]
 
+    def show(self, cells = None):
+        s=''
+        b='.12345678@Ffxt'
+        if cells is None:
+            for col in self.cells:
+                for cell in col:
+                    s+=b[cell.value]
+                s+='\n'
+            print(s)
+            s=''
+            for col in self.__mines:
+                for cell in col:
+                    s+='*' if cell else '.'
+                s+='\n'
+        else:
+            for col in cells:
+                for cell in col:
+                    s+=b[cell.value]
+                s+='\n'
+        print(s)
