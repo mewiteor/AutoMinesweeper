@@ -1,5 +1,5 @@
 from enum import Enum
-from abc import abstractmethod, ABCMeta
+from abc import abstractmethod, abstractproperty, ABCMeta
 
 class CellStatus(Enum):
     '''
@@ -67,6 +67,7 @@ class BoardInfo:
         if width < 4 or height < 4:
             raise BoardSizeError('宽度、高度太小')
 
+    @property
     def MaxMineCount(self):
         '棋盘最大雷数，用于棋盘生成'
         return self.Width * self.Height - 9
@@ -107,7 +108,7 @@ class MinesweeperGenerator(metaclass=ABCMeta):
 class MinesweeperOperator(metaclass=ABCMeta):
     '用于操作扫雷的接口类'
 
-    @abstractmethod
+    @abstractproperty
     def all_cells(self):
         '''
         获取一个扫雷棋盘中所有格子的状态的深拷贝
@@ -166,7 +167,7 @@ class MinesweeperOperator(metaclass=ABCMeta):
         '是否获胜, 返回bool'
         pass
 
-    @abstractmethod
+    @abstractproperty
     def remain_mines(self):
         '剩余雷数, 返回int'
         pass
@@ -180,14 +181,15 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
         self.cells = [[CellStatus.Unknown for _ in range(height)] for _ in range(width)]
         self._3BV = 0
         self.__mineCount = 0
+        self.debug = False
 
     def generate(self, mineCount, x, y):
         import random
         self.boardInfo.xycheck(x, y)
         if mineCount < 1:
             raise MineCountError('雷数小于1')
-        elif mineCount > self.boardInfo.MaxMineCount():
-            raise MineCountError('雷数大于{}'.format(self.boardInfo.MaxMineCount()))
+        elif mineCount > self.boardInfo.MaxMineCount:
+            raise MineCountError('雷数大于{}'.format(self.boardInfo.MaxMineCount))
         self.__mineCount = mineCount
         size = self.boardInfo.Width * self.boardInfo.Height
 
@@ -249,6 +251,7 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
                 if tempCells[i][j] != 2:
                     self._3BV += 1
 
+    @property
     def all_cells(self):
         import copy
         return copy.deepcopy(self.cells)
@@ -296,6 +299,7 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
                     return False
         return True
 
+    @property
     def remain_mines(self):
         return self.__mineCount - sum([1 if cell == CellStatus.Flagged else 0 for col in self.cells for cell in col])
 

@@ -2,7 +2,7 @@ import pygame
 import pygame.locals as pl
 import sys
 from MinesweeperGenerate import Minesweeper, CellStatus
-from MinesweeperSolver import MinesweeperSolver, CellStatusEx
+from MinesweeperSolver import MinesweeperSolverByWalkAll, MinesweeperSolverByFloodfill, CellStatusEx
 
 if len(sys.argv) != 4:
     print('normal usage: {} 宽 高 雷数'.format(sys.argv[0]))
@@ -23,6 +23,7 @@ pygame.init()
 screen = pygame.display.set_mode((cellWid * width + width - 1, cellWid * height + height - 1))
 toFlags = set()
 toSpaces = set()
+probability = None
 clk = pygame.time.Clock()
 
 def all_draw():
@@ -59,7 +60,6 @@ def all_draw():
                 textRectObj.center = cellRect.center
                 screen.blit(textSurfaceObj, textRectObj)
     for i, j in toFlags:
-        cell = ms.cells[i][j]
         cellRect = pl.Rect((i * (cellWid + 1), j * (cellWid + 1)), (cellWid, cellWid))
         pygame.draw.rect(screen, (128, 128, 128), cellRect)
         fontObj = pygame.font.SysFont('Arial', 20)
@@ -68,7 +68,6 @@ def all_draw():
         textRectObj.center = cellRect.center
         screen.blit(textSurfaceObj, textRectObj)
     for i, j in toSpaces:
-        cell = ms.cells[i][j]
         cellRect = pl.Rect((i * (cellWid + 1), j * (cellWid + 1)), (cellWid, cellWid))
         pygame.draw.rect(screen, (128, 128, 128), cellRect)
         fontObj = pygame.font.SysFont('Arial', 20)
@@ -76,6 +75,17 @@ def all_draw():
         textRectObj = textSurfaceObj.get_rect()
         textRectObj.center = cellRect.center
         screen.blit(textSurfaceObj, textRectObj)
+    if probability is not None:
+        for i in range(width):
+            for j in range(height):
+                if probability[i][j] is not None:
+                    cellRect = pl.Rect((i * (cellWid + 1), j * (cellWid + 1)), (cellWid, cellWid))
+                    fontObj = pygame.font.SysFont('Arial', 16)
+                    textSurfaceObj = fontObj.render('%4.2f' % (probability[i][j] * 100), True, (0, 0, 0))
+                    textRectObj = textSurfaceObj.get_rect()
+                    textRectObj.midtop = cellRect.midtop
+                    screen.blit(textSurfaceObj, textRectObj)
+
 
     pygame.display.update()
 
@@ -119,8 +129,22 @@ while True:
                     sys.exit()
         elif event.type == pygame.KEYDOWN:
             if event.key == pl.K_1:
-                solver = MinesweeperSolver(ms)
-                toFlags, toSpaces = solver.walkAll()
+                solver = MinesweeperSolverByFloodfill(ms)
+                toFlags, toSpaces = solver.run()
+                probability = solver.probability
+                for x, y in toFlags:
+                    ms.flag(x, y)
+                for x, y in toSpaces:
+                    if not ms.open(x, y):
+                        print('die')
+                        sys.exit()
+                toFlags, toSpaces = set(), set()
+                if ms.is_win():
+                    print('win')
+                    sys.exit()
+            elif event.key == pl.K_0:
+                ms.debug = not ms.debug
+                print('debug: {}'.format('on' if ms.debug else 'off'))
 
-    pygame.display.set_caption('扫雷 - 3BV: {}, 剩余雷数: {}'.format(ms._3BV, ms.remain_mines()))
+    pygame.display.set_caption('扫雷 - 3BV: {}, 剩余雷数: {}'.format(ms._3BV, ms.remain_mines))
     all_draw()
