@@ -41,3 +41,11 @@ target_wrapper.*
 
 # QtCreator CMake
 CMakeLists.txt.user*
+
+# vim
+*.swp
+*.un~
+.tags
+
+# python cache
+__pycache__

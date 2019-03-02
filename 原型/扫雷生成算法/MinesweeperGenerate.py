@@ -165,6 +165,8 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
     def __init__(self, width, height):
         self.boardInfo = BoardInfo(width, height)
         self.cells = [[CellStatus.Unknown for _ in range(height)] for _ in range(width)]
+        self._3BV = 0
+        self.__mineCount = 0
 
     def generate(self, mineCount, x, y):
         import random, ipdb
@@ -173,6 +175,7 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
             raise MineCountError('雷数小于1')
         elif mineCount > self.boardInfo.MaxMineCount():
             raise MineCountError('雷数大于{}'.format(self.boardInfo.MaxMineCount()))
+        self.__mineCount = mineCount
         size = self.boardInfo.Width * self.boardInfo.Height
 
         if x in [0, self.boardInfo.Width - 1] and y in [0, self.boardInfo.Height - 1]:
@@ -188,20 +191,51 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
         minelist = [True] * mineCount + [False] * (size - mineCount)
         random.shuffle(minelist)
         cI = 0
-        self.mines = []
+        self.__mines = []
         for i in range(self.boardInfo.Width):
-            row = []
+            col = []
             for j in range(self.boardInfo.Height):
                 if abs(x-i) < 2 and abs(y-j) < 2:
-                    row.append(False)
+                    col.append(False)
                 else:
                     assert cI < size
-                    # ipdb.set_trace()
-                    row.append(minelist[cI])
+                    col.append(minelist[cI])
                     cI += 1
-            self.mines.append(row)
+            self.__mines.append(col)
         assert cI == size
 
+        tempCells = []
+        for i in range(self.boardInfo.Width):
+            col = []
+            for j in range(self.boardInfo.Height):
+                if self.__mines[i][j]:
+                    col.append(2)
+                elif any([self.__mines[ii][jj] for ii, jj in self.__neighbours(i, j)]):
+                    col.append(1)
+                else:
+                    col.append(0)
+            tempCells.append(col)
+        def floodfill(i, j):
+            if tempCells[i][j] == 2:
+                return
+            b = tempCells[i][j] == 0
+            tempCells[i][j] = 2
+            if b:
+                for ii, jj in self.__neighbours(i, j):
+                    floodfill(ii, jj)
+
+        self._3BV = 0
+        for i in range(self.boardInfo.Width):
+            for j in range(self.boardInfo.Height):
+                if tempCells[i][j] == 0:
+                    self._3BV += 1
+                    floodfill(i, j)
+        print(self._3BV)
+        for i in range(self.boardInfo.Width):
+            for j in range(self.boardInfo.Height):
+                assert tempCells[i][j] in [1, 2]
+                if tempCells[i][j] != 2:
+                    self._3BV += 1
 
     def cell(self, x, y):
         self.boardInfo.xycheck(x, y)
@@ -209,25 +243,28 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
 
     def open(self, x, y):
         self.boardInfo.xycheck(x, y)
-        if self.mines[x][y]:
+        if self.__mines[x][y]:
             return False
 
-        self.open_expand(x, y)
+        self.__open_expand(x, y)
         return True
 
     def flag(self, x, y):
         self.boardInfo.xycheck(x, y)
-        self.cells[x][y] = CellStatus.Flagged
+        if self.cells[x][y] == CellStatus.Flagged:
+            self.cells[x][y] = CellStatus.Unknown
+        elif self.cells[x][y] == CellStatus.Unknown:
+            self.cells[x][y] = CellStatus.Flagged
 
-    def open_expand(self, x, y):
+    def __open_expand(self, x, y):
         '自动展开空白的周围'
         if self.cells[x][y] != CellStatus.Unknown:
             return
 
-        self.cells[x][y] = CellStatus(sum([1 if self.mines[i][j] else 0 for i,j in self.__neighbours(x, y)]))
+        self.cells[x][y] = CellStatus(sum([1 if self.__mines[i][j] else 0 for i,j in self.__neighbours(x, y)]))
         if self.cells[x][y] == CellStatus.Space:
             for i, j in self.__neighbours(x, y):
-                self.open_expand(i, j)
+                self.__open_expand(i, j)
 
     def open_final(self, x, y):
         '当数字与其周围的标旗数相同时，自动展开数字周围'
@@ -240,6 +277,16 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
                     if not self.open(i, j):
                         return False
         return True
+
+    def is_win(self):
+        for i in range(self.boardInfo.Width):
+            for j in range(self.boardInfo.Height):
+                if not self.__mines[i][j] and self.cells[i][j].value >= 9:
+                    return False
+        return True
+
+    def remain_mines(self):
+        return self.__mineCount - sum([1 if cell == CellStatus.Flagged else 0 for col in self.cells for cell in col])
 
     def __neighbours(self, x, y):
         '生成邻居列表'
