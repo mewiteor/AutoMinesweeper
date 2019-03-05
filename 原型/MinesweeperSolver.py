@@ -1,6 +1,7 @@
 from MinesweeperGenerate import MinesweeperOperator, CellStatus
 from enum import Enum
 from abc import abstractmethod, abstractproperty, ABCMeta
+import time
 
 class CellStatusEx(Enum):
     '''
@@ -19,11 +20,16 @@ class CheckState(Enum):
     space = 2
     flag_or_space = 3
 
-class RunForWalk(metaclass=ABCMeta):
-    def __init__(self, cells):
+class MinesweeperSolverBase(metaclass=ABCMeta):
+    def __init__(self, msOp: MinesweeperOperator):
+        self._cells = msOp.all_cells
+        assert all([len(self._cells[0]) == len(self._cells[i]) for i in range(1, len(self._cells))])
+        self._width = len(self._cells)
+        self._height = len(self._cells[0])
+        self.__remain_mines = msOp.remain_mines
         self.__results = []
-        self.__walk_cells = cells
         self.__probability = None
+        self.__runCount = 0
 
     @property
     def probability(self):
@@ -37,24 +43,8 @@ class RunForWalk(metaclass=ABCMeta):
     def _size(self):
         pass
 
-    @abstractproperty
-    def width(self):
-        pass
-
-    @abstractproperty
-    def height(self):
-        pass
-
     @abstractmethod
     def _append_convert(self, cells, count):
-        pass
-
-    @abstractmethod
-    def _walk_check(self, x, y):
-        pass
-
-    @abstractproperty
-    def _remain_mines(self):
         pass
 
     @abstractmethod
@@ -62,84 +52,92 @@ class RunForWalk(metaclass=ABCMeta):
         pass
 
     def __run(self, index: int, count):
+        self.__runCount += 1
         if index > self._size:
             return
         if index == self._size:
-            t = self._append_convert(self.__walk_cells, count)
+            t = self._append_convert(self._cells, count)
             if t is not None:
                 self.__results.append(t)
             return
         x, y = self._i2xy(index)
-        if self.__walk_cells[x][y] != CellStatus.Unknown:
+        if self._cells[x][y] != CellStatus.Unknown:
             self.__run(index + 1, count)
             return
-        cs = self._walk_check(x, y)
+        cs = self._check(x, y)
         if cs == CheckState.space:
-            t, self.__walk_cells[x][y] = self.__walk_cells[x][y], CellStatusEx.ToSpace
+            t, self._cells[x][y] = self._cells[x][y], CellStatusEx.ToSpace
             self.__run(index + 1, count)
-            self.__walk_cells[x][y] = t
+            self._cells[x][y] = t
         elif cs == CheckState.flag:
             if count > 0:
-                t, self.__walk_cells[x][y] = self.__walk_cells[x][y], CellStatusEx.ToFlag
+                t, self._cells[x][y] = self._cells[x][y], CellStatusEx.ToFlag
                 self.__run(index + 1, count - 1)
-                self.__walk_cells[x][y] = t
+                self._cells[x][y] = t
         elif cs == CheckState.flag_or_space:
-            t = self.__walk_cells[x][y]
+            t = self._cells[x][y]
             if count > 0:
-                self.__walk_cells[x][y] = CellStatusEx.ToFlag
+                self._cells[x][y] = CellStatusEx.ToFlag
                 self.__run(index + 1, count - 1)
-            self.__walk_cells[x][y] = CellStatusEx.ToSpace
+            self._cells[x][y] = CellStatusEx.ToSpace
             self.__run(index + 1, count)
-            self.__walk_cells[x][y] = t
+            self._cells[x][y] = t
 
-    def run(self):
+    def run(self, debug_print=False):
         flags = set()
         spaces = set()
-        self.__run(0, self._remain_mines)
+        s = 0
+        if debug_print:
+            s=time.time()
+        self.__run(0, self.__remain_mines)
+        if debug_print:
+            print(f'run count: {self.__runCount}')
+            print(f'self.__run time: {time.time() - s}s')
+            s = time.time()
         allCount = sum([self._in_count(_count, False) for _, _count in self.__results])
         if allCount < 1:
             return (flags, spaces)
-        self.__probability = [[None for _ in range(self.height)] for _ in range(self.width)]
+        if debug_print:
+            print(f'allCount time: {time.time() - s}s')
+            s = time.time()
+        self.__probability = [[None for _ in range(self._height)] for _ in range(self._width)]
         def prob_add(x, y, val):
             if self.__probability[x][y] is None:
                 self.__probability[x][y] = val
             else:
                 self.__probability[x][y] += val
-        for _cells, _count in self.__results:
-            for i in range(self.width):
-                for j in range(self.height):
-                    if _cells[i][j] == CellStatusEx.ToFlagOrSpace:
-                        self.__walk_cells[i][j] = CellStatusEx.ToFlagOrSpace
+        for __cells, _count in self.__results:
+            for i in range(self._width):
+                for j in range(self._height):
+                    if __cells[i][j] == CellStatusEx.ToFlagOrSpace:
+                        self._cells[i][j] = CellStatusEx.ToFlagOrSpace
                         prob_add(i, j, self._in_count(_count, True))
-                    elif _cells[i][j] == CellStatusEx.ToFlag:
-                        if self.__walk_cells[i][j] == CellStatus.Unknown:
-                            self.__walk_cells[i][j] = CellStatusEx.ToFlag
-                        elif self.__walk_cells[i][j] == CellStatusEx.ToSpace:
-                            self.__walk_cells[i][j] = CellStatusEx.ToFlagOrSpace
+                    elif __cells[i][j] == CellStatusEx.ToFlag:
+                        if self._cells[i][j] == CellStatus.Unknown:
+                            self._cells[i][j] = CellStatusEx.ToFlag
+                        elif self._cells[i][j] == CellStatusEx.ToSpace:
+                            self._cells[i][j] = CellStatusEx.ToFlagOrSpace
                         prob_add(i, j, self._in_count(_count, False))
-                    elif _cells[i][j] == CellStatusEx.ToSpace:
-                        if self.__walk_cells[i][j] == CellStatus.Unknown:
-                            self.__walk_cells[i][j] = CellStatusEx.ToSpace
-                        elif self.__walk_cells[i][j] == CellStatusEx.ToFlag:
-                            self.__walk_cells[i][j] = CellStatusEx.ToFlagOrSpace
+                    elif __cells[i][j] == CellStatusEx.ToSpace:
+                        if self._cells[i][j] == CellStatus.Unknown:
+                            self._cells[i][j] = CellStatusEx.ToSpace
+                        elif self._cells[i][j] == CellStatusEx.ToFlag:
+                            self._cells[i][j] = CellStatusEx.ToFlagOrSpace
                         prob_add(i, j, 0)
-        for i in range(self.width):
-            for j in range(self.height):
-                if self.__walk_cells[i][j] == CellStatusEx.ToFlag:
+        if debug_print:
+            print(f'for for time: {time.time() - s}s')
+            s = time.time()
+        for i in range(self._width):
+            for j in range(self._height):
+                if self._cells[i][j] == CellStatusEx.ToFlag:
                     flags.add((i, j))
-                elif self.__walk_cells[i][j] == CellStatusEx.ToSpace:
+                elif self._cells[i][j] == CellStatusEx.ToSpace:
                     spaces.add((i, j))
                 if self.__probability[i][j] is not None:
                     self.__probability[i][j] /= allCount
+        if debug_print:
+            print(f'for for 2 time: {time.time() - s}s')
         return (flags, spaces)
-
-class MinesweeperSolverBase(metaclass=ABCMeta):
-    def __init__(self, msOp: MinesweeperOperator):
-        self._msOp = msOp
-        self._cells = msOp.all_cells
-        assert all([len(self._cells[0]) == len(self._cells[i]) for i in range(1, len(self._cells))])
-        self._width = len(self._cells)
-        self._height = len(self._cells[0])
 
     def __xycheck(self, x, y):
         assert x >= 0
@@ -184,11 +182,9 @@ class MinesweeperSolverBase(metaclass=ABCMeta):
                 state = CheckState(state.value & CheckState.flag.value)
         return state
 
-class MinesweeperSolverByWalkAll(MinesweeperSolverBase, RunForWalk):
+class MinesweeperSolverByWalkAll(MinesweeperSolverBase):
     def __init__(self, msOp: MinesweeperOperator):
-        MinesweeperSolverBase.__init__(self, msOp)
-        RunForWalk.__init__(self, self._cells)
-        self.__remain_mines = msOp.remain_mines
+        super().__init__(msOp)
 
     def _i2xy(self, index: int):
         return (index // self._height, index % self._height)
@@ -197,37 +193,22 @@ class MinesweeperSolverByWalkAll(MinesweeperSolverBase, RunForWalk):
     def _size(self):
         return self._width * self._height
 
-    @property
-    def width(self):
-        return self._width
-
-    @property
-    def height(self):
-        return self.height
-
     def _append_convert(self, cells, count):
         import copy
         if count != 0:
             return None
         return (copy.deepcopy(cells), 0)
 
-    def _walk_check(self, x, y):
-        return self._check(x, y)
-
-    @property
-    def _remain_mines(self):
-        return self.remain_mines
-
     def _in_count(self, count, other: bool):
         return 1
 
-class MinesweeperSolverByFloodfill(MinesweeperSolverBase, RunForWalk):
+class MinesweeperSolverByFloodfill(MinesweeperSolverBase):
     def __init__(self, msOp: MinesweeperOperator):
-        MinesweeperSolverBase.__init__(self, msOp)
-        RunForWalk.__init__(self, self._cells)
+        super().__init__(msOp)
         self.__edges = []
         self.__ins = []
-        self.__remain_mines = msOp.remain_mines
+        self.__cns = []
+        self.__cn_1s = []
 
     def __split_cells(self):
         tempCells = []
@@ -247,9 +228,6 @@ class MinesweeperSolverByFloodfill(MinesweeperSolverBase, RunForWalk):
                     self.__ins.append((i, j))
 
     def run(self):
-        import ipdb
-        if self._msOp.debug:
-            ipdb.set_trace()
         self.__split_cells()
         flags = set()
         spaces = set()
@@ -262,7 +240,14 @@ class MinesweeperSolverByFloodfill(MinesweeperSolverBase, RunForWalk):
                 flags.add((x, y))
         if len(flags) + len(spaces) > 0:
             return (flags, spaces)
-        return RunForWalk.run(self)
+        import math
+        C = lambda n, m: math.factorial(n) // math.factorial(m) // math.factorial(n - m)
+        for i in range(len(self.__ins)):
+            self.__cn_1s.append(C(len(self.__ins) - 1, i))
+        for i in range(len(self.__ins) + 1):
+            self.__cns.append(C(len(self.__ins), i))
+
+        return MinesweeperSolverBase.run(self)
 
     def _i2xy(self, index: int):
         assert index >= 0 and index < len(self.__edges)
@@ -271,14 +256,6 @@ class MinesweeperSolverByFloodfill(MinesweeperSolverBase, RunForWalk):
     @property
     def _size(self):
         return len(self.__edges)
-
-    @property
-    def width(self):
-        return self._width
-
-    @property
-    def height(self):
-        return self._height
 
     def _append_convert(self, cells, count):
         import copy
@@ -296,17 +273,11 @@ class MinesweeperSolverByFloodfill(MinesweeperSolverBase, RunForWalk):
                 tc[i][j] = CellStatusEx.ToFlagOrSpace
         return (copy.deepcopy(tc), count)
 
-    def _walk_check(self, x, y):
-        return self._check(x, y)
-
-    @property
-    def _remain_mines(self):
-        return self.__remain_mines
-
     def _in_count(self, count, other: bool):
-        import math
-        C = lambda n, m: math.factorial(n) // math.factorial(m) // math.factorial(n - m)
+        assert count <= len(self.__ins)
+        assert count >= 0
         if other:
-            return C(len(self.__ins) - 1, count - 1)
+            assert count > 0
+            return self.__cn_1s[count - 1]
         else:
-            return C(len(self.__ins), count)
+            return self.__cns[count]

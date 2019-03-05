@@ -17,12 +17,11 @@ ms = Minesweeper(width, height)
 isGenerate = False
 
 cellWid = 60
-
+centerFontSize = 20
+topFontSize = 16
 
 pygame.init()
 screen = pygame.display.set_mode((cellWid * width + width - 1, cellWid * height + height - 1))
-toFlags = set()
-toSpaces = set()
 probability = None
 clk = pygame.time.Clock()
 
@@ -45,7 +44,7 @@ def all_draw():
                 pass
             elif cell.value in range(1,9):
                 pygame.draw.rect(screen, (192, 192, 192), cellRect)
-                fontObj = pygame.font.SysFont('Arial', 20)
+                fontObj = pygame.font.SysFont('Arial', centerFontSize)
                 textSurfaceObj = fontObj.render(str(cell.value), True, (0, 0, 0))
                 textRectObj = textSurfaceObj.get_rect()
                 textRectObj.center = cellRect.center
@@ -54,33 +53,17 @@ def all_draw():
                 pygame.draw.rect(screen, (128, 128, 128), cellRect)
             elif cell == CellStatus.Flagged:
                 pygame.draw.rect(screen, (128, 128, 128), cellRect)
-                fontObj = pygame.font.SysFont('Arial', 20)
+                fontObj = pygame.font.SysFont('Arial', centerFontSize)
                 textSurfaceObj = fontObj.render('F', True, (255, 0, 0))
                 textRectObj = textSurfaceObj.get_rect()
                 textRectObj.center = cellRect.center
                 screen.blit(textSurfaceObj, textRectObj)
-    for i, j in toFlags:
-        cellRect = pl.Rect((i * (cellWid + 1), j * (cellWid + 1)), (cellWid, cellWid))
-        pygame.draw.rect(screen, (128, 128, 128), cellRect)
-        fontObj = pygame.font.SysFont('Arial', 20)
-        textSurfaceObj = fontObj.render('f', True, (0, 255, 0))
-        textRectObj = textSurfaceObj.get_rect()
-        textRectObj.center = cellRect.center
-        screen.blit(textSurfaceObj, textRectObj)
-    for i, j in toSpaces:
-        cellRect = pl.Rect((i * (cellWid + 1), j * (cellWid + 1)), (cellWid, cellWid))
-        pygame.draw.rect(screen, (128, 128, 128), cellRect)
-        fontObj = pygame.font.SysFont('Arial', 20)
-        textSurfaceObj = fontObj.render('x', True, (0, 0, 255))
-        textRectObj = textSurfaceObj.get_rect()
-        textRectObj.center = cellRect.center
-        screen.blit(textSurfaceObj, textRectObj)
     if probability is not None:
         for i in range(width):
             for j in range(height):
                 if probability[i][j] is not None:
                     cellRect = pl.Rect((i * (cellWid + 1), j * (cellWid + 1)), (cellWid, cellWid))
-                    fontObj = pygame.font.SysFont('Arial', 16)
+                    fontObj = pygame.font.SysFont('Arial', topFontSize)
                     textSurfaceObj = fontObj.render('%4.2f' % (probability[i][j] * 100), True, (0, 0, 0))
                     textRectObj = textSurfaceObj.get_rect()
                     textRectObj.midtop = cellRect.midtop
@@ -101,11 +84,6 @@ while True:
             x, y = pygame.mouse.get_pos()
             x //= cellWid + 1
             y //= cellWid + 1
-
-            if (x,y) in toFlags:
-                toFlags.remove((x,y))
-            if (x,y) in toSpaces:
-                toSpaces.remove((x,y))
 
             if left:
                 if not isGenerate:
@@ -130,7 +108,11 @@ while True:
         elif event.type == pygame.KEYDOWN:
             if event.key == pl.K_1:
                 solver = MinesweeperSolverByFloodfill(ms)
+                print('begin run')
                 toFlags, toSpaces = solver.run()
+                print('finish run')
+                if len(toFlags) + len(toSpaces) < 1:
+                    print('need guess')
                 probability = solver.probability
                 for x, y in toFlags:
                     ms.flag(x, y)
@@ -138,13 +120,9 @@ while True:
                     if not ms.open(x, y):
                         print('die')
                         sys.exit()
-                toFlags, toSpaces = set(), set()
                 if ms.is_win():
                     print('win')
                     sys.exit()
-            elif event.key == pl.K_0:
-                ms.debug = not ms.debug
-                print('debug: {}'.format('on' if ms.debug else 'off'))
 
     pygame.display.set_caption('扫雷 - 3BV: {}, 剩余雷数: {}'.format(ms._3BV, ms.remain_mines))
     all_draw()

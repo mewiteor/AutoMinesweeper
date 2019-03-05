@@ -172,7 +172,18 @@ class MinesweeperOperator(metaclass=ABCMeta):
         '剩余雷数, 返回int'
         pass
 
-class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
+class MinesweeperSaver(metaclass=ABCMeta):
+    '''
+    保存扫雷棋盘
+    '''
+    @abstractproperty
+    def mines(self):
+        '''
+        雷的分布, 返回list[list[bool]]
+        '''
+        pass
+
+class Minesweeper(MinesweeperOperator, MinesweeperGenerator, MinesweeperSaver):
     '''
     扫雷类
     '''
@@ -181,9 +192,11 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
         self.cells = [[CellStatus.Unknown for _ in range(height)] for _ in range(width)]
         self._3BV = 0
         self.__mineCount = 0
-        self.debug = False
+        self.__mines = None
 
     def generate(self, mineCount, x, y):
+        print(self.__mines)
+        assert self.__mines is None
         import random
         self.boardInfo.xycheck(x, y)
         if mineCount < 1:
@@ -219,6 +232,9 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
             self.__mines.append(col)
         assert cI == size
 
+        self.__calculate_3BV()
+
+    def __calculate_3BV(self):
         tempCells = []
         for i in range(self.boardInfo.Width):
             col = []
@@ -331,3 +347,19 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator):
                     s+=b[cell.value]
                 s+='\n'
         print(s)
+
+    @property
+    def mines(self):
+        '''
+        雷的分布, 返回list[list[bool]]
+        '''
+        return self.__mines
+
+    @mines.setter
+    def mines(self, mines):
+        assert len(mines) == self.boardInfo.Width
+        assert all([len(col) == self.boardInfo.Height for col in mines])
+        assert all([isinstance(cell, bool) for col in mines for cell in col])
+        assert self.__mines is None
+        self.__mines = mines
+        self.__calculate_3BV()
