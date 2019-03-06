@@ -227,7 +227,7 @@ class MinesweeperSolverByFloodfill(MinesweeperSolverBase):
                 else:
                     self.__ins.append((i, j))
 
-    def run(self):
+    def run(self, debug_print=False):
         self.__split_cells()
         flags = set()
         spaces = set()
@@ -247,7 +247,7 @@ class MinesweeperSolverByFloodfill(MinesweeperSolverBase):
         for i in range(len(self.__ins) + 1):
             self.__cns.append(C(len(self.__ins), i))
 
-        return MinesweeperSolverBase.run(self)
+        return MinesweeperSolverBase.run(self, debug_print)
 
     def _i2xy(self, index: int):
         assert index >= 0 and index < len(self.__edges)
@@ -281,3 +281,5 @@ class MinesweeperSolverByFloodfill(MinesweeperSolverBase):
             return self.__cn_1s[count - 1]
         else:
             return self.__cns[count]
+
+# TODO: 边界分组

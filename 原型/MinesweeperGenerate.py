@@ -195,7 +195,6 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator, MinesweeperSaver):
         self.__mines = None
 
     def generate(self, mineCount, x, y):
-        print(self.__mines)
         assert self.__mines is None
         import random
         self.boardInfo.xycheck(x, y)
@@ -363,3 +362,4 @@ class Minesweeper(MinesweeperOperator, MinesweeperGenerator, MinesweeperSaver):
         assert self.__mines is None
         self.__mines = mines
         self.__calculate_3BV()
+        self.__mineCount = sum([1 if cell else 0 for col in mines for cell in col])
