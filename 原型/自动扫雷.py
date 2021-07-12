@@ -1,6 +1,6 @@
 import sys, pickle
 from MinesweeperGenerate import Minesweeper, CellStatus
-from MinesweeperSolver import MinesweeperSolverByWalkAll, MinesweeperSolverByFloodfill, CellStatusEx
+from MinesweeperSolver import MinesweeperSolverByWalkAll, MinesweeperSolverByFloodfill, MinesweeperSolverByFloodfillAndGroup, MinesweeperSolverByNumber
 from enum import Enum
 from time import time
 
@@ -28,6 +28,7 @@ class AutoRun:
         parser = argparse.ArgumentParser(description='auto minesweeper')
         parser.add_argument('--show_step', default=False, action='store_true', help='show step info')
         parser.add_argument('--show_time', default=False, action='store_true', help='show time')
+        parser.add_argument('--show_guess_times', default=False, action='store_true', help='show guess times')
         parser.add_argument('--hide_result', default=False, action='store_true', help='show time')
 
         subparsers = parser.add_subparsers(help='game mode')
@@ -49,6 +50,7 @@ class AutoRun:
         args = parser.parse_args()
         self.show_time = args.show_time
         self.show_step = args.show_step
+        self.show_guess_times = args.show_guess_times
         self.hide_result = args.hide_result
         args.func(args)
 
@@ -105,10 +107,31 @@ class AutoRun:
         ops = []
         nextops = [{'type': MinesweeperOperator.to_open, 'x': self.startx, 'y': self.starty}]
         die = False
+        guess_times = 0
         while not self.ms.is_win():
             if len(nextops) < 1:
-                solver = MinesweeperSolverByFloodfill(self.ms)
+                solver = MinesweeperSolverByNumber(self.ms)
+                # solver = MinesweeperSolverByFloodfill(self.ms)
                 toFlags, toSpaces = solver.run()
+                if solver.is_advance:
+                    if self.show_step:
+                        cells = self.ms.all_cells
+                        for i, j in toFlags:
+                            cells[i][j] = CellStatus.ToFlag
+                        for i, j in toSpaces:
+                            cells[i][j] = CellStatus.ToSpace
+                        print('advance')
+                        self.ms.show(cells)
+                if solver.is_guess:
+                    if self.show_step:
+                        cells = self.ms.all_cells
+                        for i, j in toFlags:
+                            cells[i][j] = CellStatus.ToFlag
+                        for i, j in toSpaces:
+                            cells[i][j] = CellStatus.ToSpace
+                        print('guess')
+                        self.ms.show(cells)
+                    guess_times += 1
                 needGuess = True
                 for x, y in toFlags:
                     needGuess = False
@@ -135,6 +158,7 @@ class AutoRun:
                         if self.show_step:
                             print(probability[next_point[0]][next_point[1]])
                         nextops.append({'type': MinesweeperOperator.to_open, 'x': next_point[0], 'y': next_point[1]})
+                        guess_times += 1
             op = nextops.pop(0)
             ops.append(op)
             if op['type'] == MinesweeperOperator.to_open:
@@ -164,6 +188,8 @@ class AutoRun:
         self.use_time = time() - start_time
         if self.show_time:
             print(f'time: {self.use_time}s')
+        if self.show_guess_times:
+            print(f'guess times: {guess_times}')
         return ops
 
     def save_game(self, ops):

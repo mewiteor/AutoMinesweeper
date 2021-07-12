@@ -28,6 +28,15 @@ class CellStatus(Enum):
     _8 = 8
     Unknown = 9
     Flagged = 10
+    '''
+    扫雷AI中每个格子的状态
+    ToFlag = 11: Unknown状态下的格子,已计算出此格子必然是雷,准备标旗子
+    ToSpace = 12: Unknown状态下的格子,已计算出此格子必然不是雷,准备点开
+    ToFlagOrSpace = 13: Unknown状态下的格子,已计算出此格子不确定是否有雷
+    '''
+    ToFlag = 11
+    ToSpace = 12
+    ToFlagOrSpace = 13
 
 class BoardSizeError(Exception):
     '''

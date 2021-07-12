@@ -2,7 +2,7 @@ import pygame
 import pygame.locals as pl
 import sys
 from MinesweeperGenerate import Minesweeper, CellStatus
-from MinesweeperSolver import MinesweeperSolverByWalkAll, MinesweeperSolverByFloodfill, CellStatusEx
+from MinesweeperSolver import MinesweeperSolverByWalkAll, MinesweeperSolverByFloodfill
 
 if len(sys.argv) != 4:
     print('normal usage: {} 宽 高 雷数'.format(sys.argv[0]))
